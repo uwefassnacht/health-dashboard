@@ -1,0 +1,18 @@
+{
+  // Cloudflare Worker + static assets for the health dashboard. See README.md.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "health-dashboard",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "METRICS",
+      "id": "d93d37530f1045faabbdc3e9d5e7c8ab"
+    }
+  ],
+  "observability": { "enabled": true }
+}

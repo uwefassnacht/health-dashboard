@@ -1,0 +1,14 @@
+{
+  "name": "health-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Longevity and weight dashboard for Apple Health exports, hosted on Cloudflare Workers",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "parse": "node tools/parse-export.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}

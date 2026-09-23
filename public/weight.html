@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weight over time</title>
+<style>
+  :root, .viz-root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page-plane:     #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --series-1:       #2a78d6; /* daily - blue */
+    --series-2:       #eb6834; /* monthly avg - orange */
+    --series-3:       #1baf7a; /* yearly avg - aqua */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])),
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page-plane:     #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --series-1:       #3987e5;
+      --series-2:       #d95926;
+      --series-3:       #199e70;
+    }
+  }
+  :root[data-theme="dark"],
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --page-plane:     #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --gridline:       #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --series-1:       #3987e5;
+    --series-2:       #d95926;
+    --series-3:       #199e70;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--page-plane);
+  }
+  body { padding: 24px 16px 48px; }
+  .viz-root {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: var(--text-primary);
+    max-width: 1320px;
+    margin: 0 auto;
+  }
+
+  header.head { margin-bottom: 20px; }
+  header.head h1 {
+    font-size: 22px;
+    font-weight: 650;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  header.head p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 14px;
+  }
+
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .stat-tile {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .stat-tile .label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+  }
+  .stat-tile .value {
+    font-size: 22px;
+    font-weight: 650;
+    font-variant-numeric: proportional-nums;
+  }
+  .stat-tile .sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 3px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .chart-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px 8px;
+    position: relative;
+  }
+
+  .chart-head-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+    padding-left: 2px;
+  }
+  .legend {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font: inherit;
+    font-size: 13px;
+    color: var(--text-secondary);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 0;
+  }
+  .legend-item .swatch {
+    width: 14px;
+    height: 3px;
+    border-radius: 2px;
+    flex: none;
+  }
+  .legend-item.dim { color: var(--text-muted); opacity: 0.5; }
+  .legend-item.dim .swatch { opacity: 0.4; }
+
+  .zoom-reset {
+    font: inherit;
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 9px;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    gap: 4px;
+    flex: none;
+  }
+  .zoom-reset.show { display: inline-flex; }
+  .zoom-reset:hover { color: var(--text-primary); border-color: var(--text-muted); }
+
+  .zoom-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+    padding-left: 2px;
+    margin: -4px 0 8px;
+  }
+
+  svg.chart { display: block; width: 100%; height: auto; overflow: visible; }
+  svg.chart:focus { outline: none; }
+
+  text.axis, .axis text {
+    fill: var(--text-muted);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+  .gridline { stroke: var(--gridline); stroke-width: 1; shape-rendering: crispEdges; }
+  .baseline { stroke: var(--baseline); stroke-width: 1; shape-rendering: crispEdges; }
+
+  .line-daily {
+    fill: none;
+    stroke: var(--series-1);
+    stroke-width: 1.25;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    opacity: 0.45;
+  }
+  .line-monthly {
+    fill: none;
+    stroke: var(--series-2);
+    stroke-width: 2.25;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+  .line-yearly {
+    fill: none;
+    stroke: var(--series-3);
+    stroke-width: 2.75;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+
+  .crosshair-line {
+    stroke: var(--text-muted);
+    stroke-width: 1;
+    shape-rendering: crispEdges;
+    pointer-events: none;
+    opacity: 0;
+  }
+  .crosshair-dot {
+    stroke: var(--surface-1);
+    stroke-width: 2;
+    pointer-events: none;
+    opacity: 0;
+  }
+  .end-dot {
+    stroke: var(--surface-1);
+    stroke-width: 2;
+  }
+
+  .selection-rect {
+    fill: var(--series-1);
+    fill-opacity: 0.10;
+    stroke: var(--series-1);
+    stroke-opacity: 0.35;
+    stroke-width: 1;
+    pointer-events: none;
+    display: none;
+  }
+
+  .hit-layer { fill: transparent; cursor: crosshair; touch-action: none; }
+
+  .tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    opacity: 0;
+    transform: translate(-50%, -100%);
+    transition: opacity 0.08s ease;
+    white-space: nowrap;
+    z-index: 5;
+  }
+  .tooltip .t-date { color: var(--text-secondary); margin-bottom: 4px; }
+  .tooltip .t-row { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .tooltip .t-row + .t-row { margin-top: 3px; }
+  .tooltip .t-row .t-name { color: var(--text-secondary); margin-right: auto; padding-right: 14px; }
+  .tooltip .t-row .t-val { font-weight: 650; color: var(--text-primary); }
+  .tooltip .t-key { display: inline-block; width: 10px; height: 2px; border-radius: 1px; flex: none; }
+
+  .foot-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    padding: 0 2px;
+  }
+  .table-toggle {
+    font: inherit;
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 10px;
+    cursor: pointer;
+  }
+  .table-toggle:hover { color: var(--text-primary); border-color: var(--text-muted); }
+  .source-note { font-size: 11px; color: var(--text-muted); }
+
+  .table-wrap { display: none; margin-top: 14px; overflow-x: auto; }
+  .table-wrap.open { display: block; }
+  table.yearly {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+  }
+  table.yearly th, table.yearly td {
+    text-align: right;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--gridline);
+    font-variant-numeric: tabular-nums;
+  }
+  table.yearly th:first-child, table.yearly td:first-child { text-align: left; }
+  table.yearly th {
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 12px;
+  }
+  table.yearly td { color: var(--text-primary); }
+
+  @media (max-width: 900px) {
+    .stat-row { grid-template-columns: repeat(3, 1fr); }
+  }
+  @media (max-width: 480px) {
+    .stat-row { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="appbar"></div>
+<div id="dashboard" hidden>
+<div class="viz-root">
+
+  <header class="head">
+    <h1>Weight over time</h1>
+    <p id="subtitle"></p>
+  </header>
+
+  <div class="stat-row" id="statRow"></div>
+
+  <div class="chart-card">
+    <div class="chart-head-row">
+      <div class="legend" id="legend"></div>
+      <button class="zoom-reset" id="zoomReset" type="button">&#8634; Reset zoom</button>
+    </div>
+    <div class="zoom-hint">Drag on the chart to zoom into a range</div>
+    <svg class="chart" id="chart" tabindex="0" role="img" aria-label="Line chart of weight in kilograms over time, with daily readings and 30-day and 365-day rolling averages. Drag to zoom."></svg>
+    <div class="tooltip" id="tooltip">
+      <div class="t-date" id="ttDate"></div>
+      <div id="ttRows"></div>
+    </div>
+    <div class="foot-row">
+      <button class="table-toggle" id="tableToggle" aria-expanded="false">View as table (yearly)</button>
+      <span class="source-note">Apple Health export · <span id="pointCount"></span> daily readings</span>
+    </div>
+    <div class="table-wrap" id="tableWrap">
+      <table class="yearly">
+        <thead>
+          <tr><th>Year</th><th>Average</th><th>Lowest</th><th>Highest</th><th>Readings</th></tr>
+        </thead>
+        <tbody id="yearlyBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/weight.js"></script>
+<script>HealthApp.init({ page: "weight", render: renderWeight });</script>
+
+</body>
+</html>
