@@ -6,8 +6,8 @@ A longevity dashboard and a weight chart built from an Apple Health export, host
 
 1. You open the dashboard and drop `export.zip` (from the iPhone Health app) onto the page.
 2. **The browser does all the heavy lifting.** A Web Worker reads the zip's central directory, streams the main `export.xml` through the browser's native decompressor, and parses it with a streaming, line-by-line parser. The multi-GB file is never loaded into memory as a whole. The worker computes only what the dashboard shows: daily values, 30-day and 365-day rolling averages, the seasonal profile and sleep timing.
-3. **Only that small result** (a JSON file of about 0.7 MB) is uploaded to the Worker, which stores it in Workers KV with a timestamp. Every upload is kept, so you have a history.
-4. When you open the dashboard from any device, it loads the latest stored JSON and renders it. The "History" menu in the app bar shows earlier uploads.
+3. **Only that small result** (a JSON file of about 0.7 MB) is uploaded to the Worker, which stores it in Workers KV. Since each export is a full re-export (not incremental), a new upload deletes the previous one — only the current snapshot is ever kept.
+4. When you open the dashboard from any device, it loads the latest stored JSON and renders it.
 
 The raw export never leaves your machine. The Worker never parses the uploaded JSON. It only checks the header and the size, so every request stays well under the free plan's 10 ms CPU limit.
 
@@ -79,15 +79,15 @@ curl -X POST -H 'content-type: application/json' --data-binary @metrics.json htt
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/snapshots` | list of uploads (id, export date, upload time, size) |
-| GET | `/api/snapshots/latest` | newest metrics JSON |
-| GET | `/api/snapshots/<id>` | a specific upload |
-| POST | `/api/snapshots` | store a new metrics JSON |
-| DELETE | `/api/snapshots/<id>` | remove an upload |
+| GET | `/api/snapshots` | the current upload, if any (id, export date, upload time, size) |
+| GET | `/api/snapshots/latest` | the current metrics JSON |
+| GET | `/api/snapshots/<id>` | the current upload, if the id matches |
+| POST | `/api/snapshots` | replace the stored snapshot with a new metrics JSON |
+| DELETE | `/api/snapshots/<id>` | remove the current upload |
 
 ## Free-tier budget
 
-Workers KV free tier: 100,000 reads a day, 1,000 writes a day, 1 GB of storage. Each upload uses 2 writes and about 0.7 MB. Each page view uses 1–2 reads. You would need more than 1,000 uploads to fill the storage.
+Workers KV free tier: 100,000 reads a day, 1,000 writes a day, 1 GB of storage. Only one snapshot is ever stored (about 0.7 MB), so storage is a non-issue. Each upload uses a few writes; each page view uses 1–2 reads.
 
 ## Personal settings
 

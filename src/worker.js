@@ -10,8 +10,9 @@
  *   POST   /api/snapshots           store a new snapshot (body = aggregated metrics JSON)
  *   DELETE /api/snapshots/:id       remove a snapshot
  *
- * Storage: Workers KV (binding METRICS). Each upload is kept under "snap:<ISO timestamp>"
- * so you have a history; "latest" holds a copy of the newest one.
+ * Storage: Workers KV (binding METRICS). Only the current upload is kept: a new POST
+ * deletes every previously stored snapshot first, then writes "snap:<ISO timestamp>" and
+ * a copy under "latest".
  *
  * The raw Apple Health export never reaches this Worker - the browser parses it locally
  * and only uploads the aggregated numbers (a few hundred KB).
@@ -96,11 +97,22 @@ async function createSnapshot(request, env) {
   const m = /"exportDate":"(\d{4}-\d{2}-\d{2})"/.exec(head);
   const exportDate = m ? m[1] : null;
 
+  await deleteAllSnapshots(env);
+
   const id = new Date().toISOString();
   const metadata = { id, uploadedAt: id, exportDate, bytes: body.length };
   await env.METRICS.put("snap:" + id, body, { metadata });
   await env.METRICS.put("latest", body, { metadata });
   return json({ ok: true, id, exportDate }, 201);
+}
+
+async function deleteAllSnapshots(env) {
+  let cursor;
+  do {
+    const page = await env.METRICS.list({ prefix: "snap:", cursor });
+    await Promise.all(page.keys.map((k) => env.METRICS.delete(k.name)));
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
 }
 
 async function deleteSnapshot(request, env, id) {
