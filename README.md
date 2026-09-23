@@ -32,7 +32,6 @@ wrangler.jsonc              Cloudflare configuration
 You need a free Cloudflare account and Node.js 20 or newer.
 
 ```bash
-cd cloudflare-dashboard
 npm install                                   # installs wrangler locally
 npx wrangler login                            # opens the browser to authorise
 npx wrangler kv namespace create METRICS      # prints an id
@@ -45,6 +44,8 @@ npx wrangler deploy
 ```
 
 Wrangler prints the URL, for example `https://health-dashboard.<your-subdomain>.workers.dev`. Open it and drop your `export.zip`. To use your own domain, add it under *Workers & Pages → health-dashboard → Settings → Domains & Routes*.
+
+This repo is connected to Cloudflare's Git integration (*Workers & Pages → health-dashboard → Settings → Builds*), so pushing to `main` redeploys automatically — the manual `wrangler deploy` above is only needed for the first deploy or for testing locally.
 
 ### Optional: protect uploads
 
